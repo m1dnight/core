@@ -1,0 +1,10 @@
+{
+  "domain": "loomy",
+  "name": "loomy",
+  "codeowners": ["@balloob"],
+  "dependencies": ["mqtt"],
+  "documentation": "https://www.home-assistant.io/integrations/hue",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "config_flow": false
+}
