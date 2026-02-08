@@ -141,10 +141,12 @@ def mock_backup_generation_fixture(
         patch("pathlib.Path.is_dir", lambda x: x in CONFIG_DIR_DIRS),
         patch(
             "pathlib.Path.exists",
-            lambda x: x
-            not in (
-                Path(hass.config.path("backups")),
-                Path(hass.config.path("tmp_backups")),
+            lambda x: (
+                x
+                not in (
+                    Path(hass.config.path("backups")),
+                    Path(hass.config.path("tmp_backups")),
+                )
             ),
         ),
         patch(
@@ -166,8 +168,7 @@ def mock_backup_generation_fixture(
 @pytest.fixture
 def mock_backups() -> Generator[None]:
     """Fixture to setup test backups."""
-    # pylint: disable-next=import-outside-toplevel
-    from homeassistant.components.backup import backup as core_backup
+    from homeassistant.components.backup import backup as core_backup  # noqa: PLC0415
 
     class CoreLocalBackupAgent(core_backup.CoreLocalBackupAgent):
         def __init__(self, hass: HomeAssistant) -> None:

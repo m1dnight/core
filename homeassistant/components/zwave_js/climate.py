@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from zwave_js_server.client import Client as ZwaveClient
 from zwave_js_server.const import CommandClass
 from zwave_js_server.const.command_class.thermostat import (
     THERMOSTAT_CURRENT_TEMP_PROPERTY,
@@ -31,18 +30,18 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_TENTHS, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.unit_conversion import TemperatureConverter
 
-from .const import DATA_CLIENT, DOMAIN
+from .const import DOMAIN
 from .discovery import ZwaveDiscoveryInfo
 from .discovery_data_template import DynamicCurrentTempClimateDataTemplate
 from .entity import ZWaveBaseEntity
 from .helpers import get_value_of_zwave_value
+from .models import ZwaveJSConfigEntry
 
 PARALLEL_UPDATES = 0
 
@@ -96,11 +95,11 @@ ATTR_FAN_STATE = "fan_state"
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: ZwaveJSConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Z-Wave climate from config entry."""
-    client: ZwaveClient = config_entry.runtime_data[DATA_CLIENT]
+    client = config_entry.runtime_data.client
 
     @callback
     def async_add_climate(info: ZwaveDiscoveryInfo) -> None:
@@ -130,7 +129,7 @@ class ZWaveClimate(ZWaveBaseEntity, ClimateEntity):
     _attr_precision = PRECISION_TENTHS
 
     def __init__(
-        self, config_entry: ConfigEntry, driver: Driver, info: ZwaveDiscoveryInfo
+        self, config_entry: ZwaveJSConfigEntry, driver: Driver, info: ZwaveDiscoveryInfo
     ) -> None:
         """Initialize thermostat."""
         super().__init__(config_entry, driver, info)
@@ -233,7 +232,7 @@ class ZWaveClimate(ZWaveBaseEntity, ClimateEntity):
         """Optionally return the temperature value of a setpoint."""
         try:
             temp = self._setpoint_value_or_raise(setpoint_type)
-        except (IndexError, ValueError):
+        except IndexError, ValueError:
             return None
         return get_value_of_zwave_value(temp)
 
@@ -426,7 +425,7 @@ class ZWaveClimate(ZWaveBaseEntity, ClimateEntity):
                 min_temp = temp.metadata.min
                 base_unit = self.temperature_unit
         # In case of any error, we fallback to the default
-        except (IndexError, ValueError, TypeError):
+        except IndexError, ValueError, TypeError:
             pass
 
         return TemperatureConverter.convert(min_temp, base_unit, self.temperature_unit)
@@ -442,7 +441,7 @@ class ZWaveClimate(ZWaveBaseEntity, ClimateEntity):
                 max_temp = temp.metadata.max
                 base_unit = self.temperature_unit
         # In case of any error, we fallback to the default
-        except (IndexError, ValueError, TypeError):
+        except IndexError, ValueError, TypeError:
             pass
 
         return TemperatureConverter.convert(max_temp, base_unit, self.temperature_unit)
@@ -563,7 +562,7 @@ class DynamicCurrentTempClimate(ZWaveClimate):
     """Representation of a thermostat that can dynamically use a different Zwave Value for current temp."""
 
     def __init__(
-        self, config_entry: ConfigEntry, driver: Driver, info: ZwaveDiscoveryInfo
+        self, config_entry: ZwaveJSConfigEntry, driver: Driver, info: ZwaveDiscoveryInfo
     ) -> None:
         """Initialize thermostat."""
         super().__init__(config_entry, driver, info)

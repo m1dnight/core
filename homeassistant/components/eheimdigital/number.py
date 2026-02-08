@@ -2,10 +2,11 @@
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Generic, TypeVar, override
+from typing import Any, override
 
 from eheimdigital.classic_vario import EheimDigitalClassicVario
 from eheimdigital.device import EheimDigitalDevice
+from eheimdigital.filter import EheimDigitalFilter
 from eheimdigital.heater import EheimDigitalHeater
 from eheimdigital.types import HeaterUnit
 
@@ -21,6 +22,7 @@ from homeassistant.const import (
     PRECISION_WHOLE,
     EntityCategory,
     UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -30,16 +32,44 @@ from .entity import EheimDigitalEntity, exception_handler
 
 PARALLEL_UPDATES = 0
 
-_DeviceT_co = TypeVar("_DeviceT_co", bound=EheimDigitalDevice, covariant=True)
-
 
 @dataclass(frozen=True, kw_only=True)
-class EheimDigitalNumberDescription(NumberEntityDescription, Generic[_DeviceT_co]):
+class EheimDigitalNumberDescription[_DeviceT: EheimDigitalDevice](
+    NumberEntityDescription
+):
     """Class describing EHEIM Digital sensor entities."""
 
-    value_fn: Callable[[_DeviceT_co], float | None]
-    set_value_fn: Callable[[_DeviceT_co, float], Awaitable[None]]
-    uom_fn: Callable[[_DeviceT_co], str] | None = None
+    value_fn: Callable[[_DeviceT], float | None]
+    set_value_fn: Callable[[_DeviceT, float], Awaitable[None]]
+    uom_fn: Callable[[_DeviceT], str] | None = None
+
+
+FILTER_DESCRIPTIONS: tuple[EheimDigitalNumberDescription[EheimDigitalFilter], ...] = (
+    EheimDigitalNumberDescription[EheimDigitalFilter](
+        key="high_pulse_time",
+        translation_key="high_pulse_time",
+        entity_category=EntityCategory.CONFIG,
+        native_step=PRECISION_WHOLE,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=NumberDeviceClass.DURATION,
+        native_min_value=5,
+        native_max_value=200000,
+        value_fn=lambda device: device.high_pulse_time,
+        set_value_fn=lambda device, value: device.set_high_pulse_time(int(value)),
+    ),
+    EheimDigitalNumberDescription[EheimDigitalFilter](
+        key="low_pulse_time",
+        translation_key="low_pulse_time",
+        entity_category=EntityCategory.CONFIG,
+        native_step=PRECISION_WHOLE,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=NumberDeviceClass.DURATION,
+        native_min_value=5,
+        native_max_value=200000,
+        value_fn=lambda device: device.low_pulse_time,
+        set_value_fn=lambda device, value: device.set_low_pulse_time(int(value)),
+    ),
+)
 
 
 CLASSICVARIO_DESCRIPTIONS: tuple[
@@ -136,7 +166,7 @@ async def async_setup_entry(
         device_address: dict[str, EheimDigitalDevice],
     ) -> None:
         """Set up the number entities for one or multiple devices."""
-        entities: list[EheimDigitalNumber[EheimDigitalDevice]] = []
+        entities: list[EheimDigitalNumber[Any]] = []
         for device in device_address.values():
             if isinstance(device, EheimDigitalClassicVario):
                 entities.extend(
@@ -144,6 +174,13 @@ async def async_setup_entry(
                         coordinator, device, description
                     )
                     for description in CLASSICVARIO_DESCRIPTIONS
+                )
+            if isinstance(device, EheimDigitalFilter):
+                entities.extend(
+                    EheimDigitalNumber[EheimDigitalFilter](
+                        coordinator, device, description
+                    )
+                    for description in FILTER_DESCRIPTIONS
                 )
             if isinstance(device, EheimDigitalHeater):
                 entities.extend(
@@ -163,18 +200,18 @@ async def async_setup_entry(
     async_setup_device_entities(coordinator.hub.devices)
 
 
-class EheimDigitalNumber(
-    EheimDigitalEntity[_DeviceT_co], NumberEntity, Generic[_DeviceT_co]
+class EheimDigitalNumber[_DeviceT: EheimDigitalDevice](
+    EheimDigitalEntity[_DeviceT], NumberEntity
 ):
     """Represent a EHEIM Digital number entity."""
 
-    entity_description: EheimDigitalNumberDescription[_DeviceT_co]
+    entity_description: EheimDigitalNumberDescription[_DeviceT]
 
     def __init__(
         self,
         coordinator: EheimDigitalUpdateCoordinator,
-        device: _DeviceT_co,
-        description: EheimDigitalNumberDescription[_DeviceT_co],
+        device: _DeviceT,
+        description: EheimDigitalNumberDescription[_DeviceT],
     ) -> None:
         """Initialize an EHEIM Digital number entity."""
         super().__init__(coordinator, device)
